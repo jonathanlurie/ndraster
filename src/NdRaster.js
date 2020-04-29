@@ -92,24 +92,12 @@ class NdRaster {
     }
 
     this.shape = shape.slice()
-
-    // const reverseShape = shape.reverse()
-    // const strides = [1]
-
-    // for (let i = 1; i < reverseShape.length; i += 1) {
-    //   strides.push(reverseShape[i - 1] * strides[i - 1])
-    // }
-
-    // this.strides = strides.reverse()
-
     this.strides = new Array(shape.length).fill(0)
     this.strides[this.shape.length - 1] = 1
 
     for (let i = this.shape.length - 2; i >= 0; i -= 1) {
       this.strides[i] = this.shape[i + 1] * this.strides[i + 1]
     }
-    console.log(this.strides)
-    
   }
 
 
