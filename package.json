@@ -1,11 +1,11 @@
 {
-  "name": "es6module",
+  "name": "ndraster",
   "version": "0.1.0",
   "description": "A starting point to create ES6 module for browser",
-  "repository": "jonathanlurie/es6module",
-  "main": "dist/es6module.cjs.js",
-  "module": "dist/es6module.es.js",
-  "browser": "dist/es6module.umd.js",
+  "repository": "jonathanlurie/ndraster",
+  "main": "dist/ndraster.cjs.js",
+  "module": "dist/ndraster.es.js",
+  "browser": "dist/ndraster.umd.js",
   "entry": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

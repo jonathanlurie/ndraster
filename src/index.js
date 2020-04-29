@@ -1,5 +1,5 @@
-import Foo from './Foo'
+import NdRaster from './NdRaster'
 
 export default ({
-  Foo,
+  NdRaster,
 })

@@ -4,24 +4,28 @@
 </head>
 <body>
   <!-- importing the automatically build module -->
-  <script src="../dist/es6module.umd.js"></script>
-
-  <!-- The minified version is also accessible -->
-  <!-- <script src="../dist/es6module.umd.min.js"></script> -->
+  <script src="../dist/ndraster.umd.js"></script>
 
   <p>Open Javascript console.</p>
 
   <script>
 
-    // the foo object is part of our es6module module
-    var foo = new es6module.Foo(20, 30);
+  
+    let nd = new ndraster.NdRaster(
+      [
+        0, 1, 2,  3, 
+        4, 5, 6,  7,
+        8, 9, 10, 11,
 
-    // do something with foo
-    foo.printAnAttribute();
-    foo.setAnAttribute(34)
-    foo.printAnAttribute();
-    foo.testWorker();
-  </script>
+        12, 13, 14, 15,
+        16, 17, 18, 19,
+        20, 21, 22, 23
+      ],
+       
+      {
+        shape: [2, 3, 4]
+      })
+    </script>
 
 </body>
 </html>
