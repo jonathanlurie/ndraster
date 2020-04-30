@@ -10,21 +10,51 @@
 
   <script>
 
-  
-    let nd = new ndraster.NdRaster(
-      [
-        0, 1, 2,  3, 
+    let arr = [
+        0, 1, 2,  3,
         4, 5, 6,  7,
         8, 9, 10, 11,
 
         12, 13, 14, 15,
         16, 17, 18, 19,
         20, 21, 22, 23
+      ]
+
+    let arr2 = [
+      [0, 1, 2],
+      [3, 4, 5],
+      [6, 7, 8],
+      [9, 10, 11]
+    ]
+
+    let arr3 = [
+      [
+        [0, 1, 2],
+        [3, 4, 5],
+        [6, 7, 8],
+        [9, 10, 11]
       ],
-       
+      [
+        [12, 13, 14],
+        [15, 16, 17],
+        [18, 19, 20],
+        [21, 22, 23]
+      ]
+    ]
+
+    // console.log(ndraster.NdRaster.flattenNestedArray(arr3))
+    
+  
+    let nd = new ndraster.NdRaster(
+      arr,
       {
         shape: [2, 3, 4]
       })
+
+    let nd2 = new ndraster.NdRaster(arr3)
+
+    console.log(nd2)
+    
     </script>
 
 </body>

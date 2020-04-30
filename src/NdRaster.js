@@ -1,7 +1,12 @@
+
+/* global BigUint64Array, BigInt64Array */
+/* eslint no-undef: "error" */
+
 const DEFAULT = {
   dtype: 'float64',
   copy: false,
 }
+
 
 const DTYPE_TO_TYPEDARRAY_CONSTRUCTOR = {
   uint8: Uint8Array,
@@ -34,7 +39,7 @@ class NdRaster {
   constructor(arr, options = {}) {
     const providedDtype = 'dtype' in options ? options.dtype : null
     const copy = 'copy' in options ? (!!options.copy) : false
-    const shape = 'shape' in options ? options.shape : null
+    let shape = 'shape' in options ? options.shape : null
 
     this.data = null
     this.dtype = null
@@ -49,11 +54,25 @@ class NdRaster {
     const guessedDtype = NdRaster.guessDtype(arr)
     const dtypeToUse = providedDtype ? providedDtype : DEFAULT.dtype
     const DtypeConstructor = DTYPE_TO_TYPEDARRAY_CONSTRUCTOR[dtypeToUse]
+    const isGenericArray = NdRaster.isGenericArray(arr)
 
-    if (NdRaster.isGenericArray(arr)
+    if (isGenericArray
     || guessedDtype !== dtypeToUse
     || copy) {
-      this.data = new DtypeConstructor(arr)
+      let arrData = arr
+
+      // if a generic Array is provided, it could be a nested array
+      if (isGenericArray) {
+        const arrConfig = NdRaster.flattenNestedArray(arr)
+        arrData = arrConfig.array
+
+        // if no shape is provided, then we use the shape deduced by the flattening
+        if (!shape) {
+          shape = arrConfig.shape
+        }
+      }
+
+      this.data = new DtypeConstructor(arrData)
       this.dtype = dtypeToUse
     } else if (guessedDtype) {
       this.data = new DtypeConstructor(arr)
@@ -64,6 +83,8 @@ class NdRaster {
 
     if (shape) {
       this.setShape(shape)
+    } else {
+      this.setShape([this.data.length])
     }
   }
 
@@ -138,6 +159,56 @@ class NdRaster {
    */
   static isGenericArray(arr) {
     return (arr instanceof Array)
+  }
+
+  /**
+   * Get the shape of a nested array. A nested array is a generic Array that contains other arrays
+   * such as [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]] which a a 2D array of dimension ('C' ordered) [4, 3]
+   * @param {Array} arr - the potentially multidimensional nested array
+   * @returns {Array|null} Return a dimension array where the first element is the size of the slowest varying dimension
+   * and the last element is the fastest varying dimension. Returns null if the array is not valid
+   */
+  static getNestedArrayShape(arr) {
+    const shape = []
+
+    if (!Array.isArray(arr)) {
+      throw new Error('The value provided is not an Array')
+    }
+
+    let arrDigger = arr
+
+    while (Array.isArray(arrDigger)) {
+      const len = arrDigger.length
+      if (len === 0) {
+        throw new Error('An empty array cannot be used as data.')
+      }
+      shape.push(len)
+      arrDigger = arrDigger[0]
+    }
+
+    return shape
+  }
+
+
+  /**
+   * Flattens a nested Array and get the shape
+   * @param {Array} arr - a potentially nested Array
+   * @returns {Object} like {array: Array, shape: Array}
+   */
+  static flattenNestedArray(arr) {
+    const shape = NdRaster.getNestedArrayShape(arr)
+    const array = arr.flat(shape.length)
+    const expectedLength = shape.reduce((a, b) => a * b)
+
+    // this ensures that all the element in a given dimension have the same size
+    if (expectedLength !== array.length) {
+      throw new Error('The provided nested Array has size inconsistencies.')
+    }
+
+    return {
+      array,
+      shape,
+    }
   }
 }
 
