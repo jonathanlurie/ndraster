@@ -6,6 +6,7 @@
 
   /* global BigUint64Array, BigInt64Array */
   /* eslint no-undef: "error" */
+  /* eslint-disable no-bitwise */
 
   const DEFAULT = {
     dtype: 'float64',
@@ -307,7 +308,43 @@
     }
 
 
+    /**
+     * @private
+     * Get the ND position from the 1D buffer position
+     * @param {number} offset - offset within the 1D data buffer
+     * @return {Array}
+     */
+    _bufferOffsetToPositionND(offset) {
+      if (offset < 0 || offset >= this._data.length) {
+        throw new Error('Position 1D is out of bound.')
+      }
 
+      const posND = this._shape.slice().fill(0);
+      let r = offset;
+
+      for (let i = 0; i < posND.length; i += 1) {
+        posND[i] = ~~(r / this._strides[i]);
+        r %= this._strides[i];
+      }
+
+      return posND
+    }
+
+
+    /**
+     * Get the buffer position from a ND position
+     * @param {Array} position - the position in ND
+     * @returns {number}
+     */
+    _positionNDToBufferOffset(position) {
+      this._throwIfInvalidPosition(position);
+      let dataOffset = 0;
+      for (let i = 0; i < position.length; i += 1) {
+        dataOffset += position[i] * this._strides[i];
+      }
+
+      return dataOffset
+    }
 
 
     /**
@@ -442,6 +479,45 @@
 
       return slice
     }
+
+
+    // TODO: maybe adjust the shape for lower dim
+    // write doc
+    thinSlice(position, options = {}) {
+      const min = this._shape.slice().fill(0);
+      const max = this._shape.slice().fill(Infinity);
+
+      position.forEach((v, i) => {
+        min[i] = v;
+        max[i] = v + 1;
+      });
+
+      return this.slice({ ...options, min, max })
+    }
+
+
+    /**
+     * The forEach() method execute the same callback function for each element of
+     * this NdRaster but does not modify its values unless the callback function does so.
+     * The callback function is called with the arguments:
+     * - {number} value - the value of this NdArray at this position
+     * - {Array} position - N-dimensional position, from slowest to fastest varying
+     * The callback is not expected to return any value.
+     * @param {Function} f - the callback function
+     */
+    forEach(f) {
+      if (typeof f !== 'function') {
+        throw new Error('The .forEach() method expects a function.')
+      }
+
+      this._bufferOffsetToPositionND();
+      for (let i = 0; i < this._data.length; i += 1) {
+        f( this._data[i], this._bufferOffsetToPositionND(i));
+      }
+    }
+
+
+
 
 
     /**

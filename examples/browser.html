@@ -43,7 +43,7 @@
     ]
 
 
-    let sideSize = 10000
+    let sideSize = 1000
     let dim = 2
     let arr4 = new Uint32Array(sideSize ** dim)
     for (let i = 0; i < arr4.length; i += 1) {
@@ -74,6 +74,11 @@
 
     // this actuall calls a setter
     // nd2.shape = [8, 3]
+
+
+    nd2.forEach((val, pos) => {
+      console.log(pos, val)
+    })
 
     console.log('nd0', nd0)
     console.log('nd1', nd1)
