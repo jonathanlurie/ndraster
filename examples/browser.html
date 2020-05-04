@@ -22,9 +22,9 @@
 
     let arr2 = [
       [0, 1, 2],
-      [3, 4, 5],
-      [6, 7, 8],
-      [9, 10, 11]
+      [103, 104, 105],
+      [206, 207, 208],
+      [309, 310, 311]
     ]
 
     let arr3 = [
@@ -42,24 +42,45 @@
       ]
     ]
 
-    // console.log(ndraster.NdRaster.flattenNestedArray(arr3))
+
+    let sideSize = 10000
+    let dim = 2
+    let arr4 = new Uint32Array(sideSize ** dim)
+    for (let i = 0; i < arr4.length; i += 1) {
+      arr4[i] = i
+    }
+
     
+    let nd0 = new ndraster.NdRaster({data: arr1})
   
     let nd1 = new ndraster.NdRaster(
-      arr1,
       {
+        data: arr1,
         shape: [2, 3, 4],
       })
 
-    let nd2 = new ndraster.NdRaster(arr2, {dtype: 'int32'})
-    let nd3 = new ndraster.NdRaster(arr3)
+    let nd2 = new ndraster.NdRaster({data: arr2, dtype: 'int32'})
+    let nd3 = new ndraster.NdRaster({data: arr3})
+    let nd4 = new ndraster.NdRaster({data: arr4, shape: [sideSize, sideSize]})
+    let nd5 = new ndraster.NdRaster({shape: [100, 30]})
+
+    // console.time('slice nd')
+    // let slice = nd4.slice({min: [1, 1], max: [9990, 9990]})
+    // console.timeEnd('slice nd')
+
+    // console.time('slice')
+    // let copy = nd4.copy()
+    // console.timeEnd('slice')
 
     // this actuall calls a setter
     // nd2.shape = [8, 3]
 
+    console.log('nd0', nd0)
     console.log('nd1', nd1)
     console.log('nd2', nd2)
     console.log('nd3', nd3)
+    console.log('nd4', nd4)
+    console.log('nd5', nd5)
     
     </script>
 

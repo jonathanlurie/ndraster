@@ -92,10 +92,15 @@ class NdRaster {
    *                 This order is also the default order used in Numpy.
    *                 (default: single dimension of the size of the provided array)
    */
-  constructor(arr, options = {}) {
+  constructor(options = {}) {
     const providedDtype = 'dtype' in options ? options.dtype : null;
     const copy = 'copy' in options ? (!!options.copy) : false;
     let shape = 'shape' in options ? options.shape : null;
+    const arr = 'data' in options ? options.data : null;
+
+    if (!shape && !arr) {
+      throw new Error('At least a shape of a data array is expected to construct a NdRaster.')
+    }
 
     this._data = null;
     this._dtype = null;
@@ -111,7 +116,10 @@ class NdRaster {
     const dtypeToUse = providedDtype ? providedDtype : DEFAULT.dtype;
     const isGenericArray = NdRaster.isGenericArray(arr);
 
-    if (isGenericArray
+    if (!arr && shape) {
+      const expectedLength = shape.reduce((a, b) => a * b);
+      this._data = new DTYPE_TO_TYPEDARRAY_CONSTRUCTOR[dtypeToUse](expectedLength);
+    } else if (isGenericArray
     || (guessedDtype !== dtypeToUse && providedDtype)
     || copy) {
       let arrData = arr;
@@ -314,6 +322,12 @@ class NdRaster {
   }
 
 
+  /**
+   * Create a deep copy of this NdRaster. The copy will not share any buffer with this NdRaster.
+   * @param {Object} options - The options object
+   * @param {string} options.dtype - If the dtype of the copy. Data will be clamped if necessary
+   * @return {NdRaster}
+   */
   copy(options = {}) {
     const dtype = 'dtype' in options ? options.dtype : this._dtype;
 
@@ -328,7 +342,8 @@ class NdRaster {
       dataCopy = NdRaster.copyDataAsType(this._data, dtype);
     }
 
-    const copy = new NdRaster(dataCopy, {
+    const copy = new NdRaster({
+      data: dataCopy,
       copy: false,
       shape: this.shape,
     });
@@ -337,12 +352,127 @@ class NdRaster {
 
 
   /**
-   * 
-   * @param {*} start 
-   * @param {*} end 
+   * Make a copy of this NdRaster but with data of a different dtype.
+   * This is a shorthand to the .copy() method.
+   * The data of the new NdRaster will not share buffer with this one.
+   * @param {string} dtype - dtype of the new NdRaster
+   * @returns {NdRaster}
    */
-  slice(start, end) {
+  asType(dtype) {
+    return this.copy({ dtype })
+  }
 
+
+  /**
+   * Slice this NdRaster
+   * @param {Object} options - the option object
+   * @param {Array} options.min - N-dimensional position of the lower bound of the dataset. In an array such as [number, number, number, ...] from the slowest varying to the fastest (default: origin, such as [0, 0, ..., 0])
+   * @param {Array} options.max - N-dimensional position of the upper bound of the dataset. In an array such as [number, number, number, ...] from the slowest varying to the fastest (default: upper boundaries of the dataset)
+   * @param {string} options.dtype - enforce a dtype that is different from the original dtype of the dataset
+   * @param {boolean} options.strict - in strict mode (true), the min and max are expected to be within the boundaries of the original NdRaster and will throw an error otherwise. In non-strict mode, the min and max will be recomputed to be contrained to the boundaries (default: false)
+   * @returns {NdRaster}
+   */
+  slice(options = {}) {
+    let min = 'min' in options ? options.min : this._shape.slice().fill(0);
+    let max = 'max' in options ? options.max : this.shape;
+    const dtype = 'dtype' in options ? options.dtype : this._dtype;
+    const strict = 'strict' in options ? !!options.strict : false;
+
+    if (!(dtype in DTYPE_TO_TYPEDARRAY_CONSTRUCTOR)) {
+      throw new Error('The provided dtype does not exist.')
+    }
+
+    // If a full copy is asked, then it's faster with the copy method
+    if (!('min' in options) && !('max' in options)) {
+      return this.copy(options)
+    }
+
+    // checking that provided boundaries are compliant to the dataset
+    if (min.length !== this._shape.length || max.length !== this._shape.length) {
+      throw new Error(`The boundaries must contain ${this._shape.length} elements.`)
+    }
+
+    if (strict) {
+      for (let i = 0; i < min.length; i += 1) {
+        if (min[i] < 0
+        || min[i] > this._shape[i] - 1
+        || max[i] < 1
+        || max[i] > this._shape) {
+          throw new Error(`The largest boundaries possible for the ${i}th dimension are [0, ${this._shape[i]}]`)
+        }
+      }
+    } else {
+      min = min.map((el) => Math.max(el, 0));
+      max = max.map((el, i) => Math.min(el, this._shape[i]));
+    }
+
+    const sliceShape = max.map((el, i) => el - min[i]);
+    const expectedLength = sliceShape.reduce((a, b) => a * b);
+    const buffer = new DTYPE_TO_TYPEDARRAY_CONSTRUCTOR[dtype](expectedLength);
+
+    let increment1D = 0;
+    let incrementPos = min.slice();
+
+    while (incrementPos) {
+      let value = this.get(incrementPos);
+
+      // clamping the value on the provided dtype
+      if (value < DTYPE_TO_BOUND.min) {
+        value = DTYPE_TO_BOUND.min;
+      } else if (value > DTYPE_TO_BOUND.max) {
+        value = DTYPE_TO_BOUND.max;
+      }
+
+      buffer[increment1D] = value;
+      incrementPos = NdRaster.getNextPosition(incrementPos, min, max);
+      increment1D += 1;
+    }
+
+    const slice = new NdRaster({
+      data: buffer,
+      copy: false,
+      shape: sliceShape,
+    });
+
+    return slice
+  }
+
+
+  /**
+   * Within a N-dimensional bounding box (from min to max) and given a position in this bounding box,
+   * find the next N-dimensional position that is on the shortest distance in the 1D data buffer (minimize the buffer jump)
+   * @param {Array} position - N-dimensional position in an array such as [number, number, number, ...] from the slowest varying to the fastest
+   * @param {Array} min - N-dimensional position of the lower bound of the dataset. In an array such as [number, number, number, ...] from the slowest varying to the fastest
+   * @param {Array} max - N-dimensional position of the upper bound of the dataset. In an array such as [number, number, number, ...] from the slowest varying to the fastest
+   * @returns {Array|null} - the N-dimensional position that comes just after in the 1D data buffer. Or null if the next position is out of bound.
+   */
+  static getNextPosition(position, min, max) {
+    const nextPos = position.slice();
+
+    // trying to increment each position, from the fastest varying to the slowest.
+    for (let i = position.length - 1; i >= 0; i -= 1) {
+      // make sure the given position is within bounds
+      if (position[i] < min[i] || position[i] >= max[i]) {
+        return null
+      }
+
+      const dimIncreased = position[i] + 1;
+
+      if (dimIncreased >= max[i]) {
+        // next position is out of bounding box
+        if (i === 0) {
+          return null
+        }
+
+        // back to the begining for this dim (the next slower one will be increased)
+        nextPos[i] = min[i];
+      } else {
+        nextPos[i] = dimIncreased;
+        return nextPos
+      }
+    }
+
+    return null
   }
 
 
@@ -468,9 +598,7 @@ class NdRaster {
 
 
   // TODO:
-  // copy/clone/astype
   // stat (min max)
-  // get multiple values at once (all dim) --> slice
   // forEach
   // simple operator + - / * (with scalar and other NdRasters) --> create a new one
   // Constructor: data should be optional but at least one of data and shape must be provided
